@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+function portalUrl(secrets) {
+  return secrets.SSD_UPLOAD_URL.replace(/\/+$/, '') + '/ui/artifact-security-issues/generated';
+}
+
 async function createPRComment(github, context, secrets) {
   const findingsPath = path.join(os.homedir(), '.local', 'bin', 'ssd-scan-results', 'diff-scan-findings.json');
   
@@ -62,7 +66,7 @@ async function createPRComment(github, context, secrets) {
       commentParts.push('');
       commentParts.push('📁 [Download Summary File](' + secrets.GITHUB_SERVER_URL + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + secrets.GITHUB_RUN_ID + '#artifacts) (`diff-scan-summary-pr-' + context.issue.number + '`)');
       commentParts.push('');
-      commentParts.push('🌐 [Explore Findings in SSD Portal](' + secrets.SSD_UPLOAD_URL + '/ui/artifact-security/generated)');
+      commentParts.push('🌐 [Explore Findings in SSD Portal](' + portalUrl(secrets) + ')');
       commentParts.push('');
       commentParts.push('---');
       
@@ -150,7 +154,7 @@ async function createPRComment(github, context, secrets) {
         '**📎 Results:**\n\n' +
         '📋 [View Workflow Run](' + secrets.GITHUB_SERVER_URL + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + secrets.GITHUB_RUN_ID + ')\n\n' +
         '📁 [Download Artifacts](' + secrets.GITHUB_SERVER_URL + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + secrets.GITHUB_RUN_ID + '#artifacts)\n\n' +
-        '🌐 [Explore in SSD Portal](' + secrets.SSD_UPLOAD_URL + '/ui/artifact-security/generated)\n\n' +
+        '🌐 [Explore in SSD Portal](' + portalUrl(secrets) + ')\n\n' +
         '_Error details: ' + error.message + '_';
       
       await github.rest.issues.createComment({
@@ -169,7 +173,7 @@ async function createPRComment(github, context, secrets) {
       '**📎 Results:**\n\n' +
       '📋 [View Workflow Run](' + secrets.GITHUB_SERVER_URL + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + secrets.GITHUB_RUN_ID + ')\n\n' +
       '📁 [Download Artifacts](' + secrets.GITHUB_SERVER_URL + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + secrets.GITHUB_RUN_ID + '#artifacts)\n\n' +
-      '🌐 [Explore in SSD Portal](' + secrets.SSD_UPLOAD_URL + '/ui/artifact-security/generated)';
+      '🌐 [Explore in SSD Portal](' + portalUrl(secrets) + ')';
     
     await github.rest.issues.createComment({
       owner: context.repo.owner,
@@ -191,7 +195,7 @@ function showArtifactInfo(context, secrets) {
   console.log('');
   console.log('🔗 Download Links:');
   console.log('   • GitHub Artifact: ' + secrets.GITHUB_SERVER_URL + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + secrets.GITHUB_RUN_ID + '#artifacts');
-  console.log('   • SSD Portal: ' + secrets.SSD_UPLOAD_URL + '/ui/artifact-security/generated');
+  console.log('   • SSD Portal: ' + portalUrl(secrets));
   console.log('');
   
   if (fs.existsSync(findingsPath)) {
