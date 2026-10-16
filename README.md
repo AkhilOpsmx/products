@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-Duende%20Software-blue)](https://duendesoftware.com/license)
 [![GitHub Discussions](https://img.shields.io/github/discussions/DuendeSoftware/community)](https://github.com/orgs/DuendeSoftware/discussions)
 
-This repository contains the core products developed by Duende Software.
+This repository contains the core products developed by Duende Software.test
 
 ### Duende IdentityServer
 [![NuGet](https://img.shields.io/nuget/v/Duende.IdentityServer.svg)](https://www.nuget.org/packages/Duende.IdentityServer)
