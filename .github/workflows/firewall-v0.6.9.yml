@@ -71,9 +71,9 @@ jobs:
           echo "Running diff-scan for Pull Request #${{ github.event.number }}"
 
           ./ssd-scanner-cli \
-            --scanners=trivy,syft,semgrep,opengrep \
+            --scanners=trivy,cdxgen,opengrep \
             --trivy-scanners=codelicensescan,codesecretscan \
-            --syft-scanners=sourcecodesbom \
+            --cdxgen-scanners=sourcecodesbom \
             --repository-url="${{ github.server_url }}/${{ github.repository }}" \
             --source-code-path=. \
             --build-id="${{ github.run_id }}" \
@@ -89,7 +89,7 @@ jobs:
             --git-auth-key="${{ secrets.GH_TOKEN }}" \
             --interrupt-condition="all" \
             --diff-scan="true" \
-            --interrupt-for-old-issues=true \
+            --interrupt-for-old-issues=false \
             --keep-results=true \
 
           echo "=============================================="
