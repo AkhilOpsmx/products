@@ -1,0 +1,39 @@
+
+name: .NET Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Test Solution
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.402
+
+      - name: Display SDK Version
+        run: dotnet --version
+
+      - name: Restore Dependencies
+        run: dotnet restore libs.slnx
+
+      - name: Build Solution
+        run: dotnet build libs.slnx --configuration Release --no-restore
+
+      - name: Run Tests
+        run: dotnet test libs.slnx --configuration Release --no-build
+
