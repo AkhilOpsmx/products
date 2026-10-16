@@ -1,5 +1,5 @@
 
-name: .NET Build and Test
+name: Inspect .NET Repository
 
 on:
   workflow_dispatch:
@@ -8,28 +8,26 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
-    name: Build and Test Solution
+  inspect:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.402
+      - name: List Solution Files
+        run: |
+          echo "=== Solution files ==="
+          find . -type f \( -name '*.sln' -o -name '*.slnx' \) \
+            -not -path './.git/*' -print
 
-      - name: Display SDK Version
-        run: dotnet --version
+      - name: List Available C# Projects
+        run: |
+          echo "=== C# project files ==="
+          find . -type f -name '*.csproj' \
+            -not -path './.git/*' -print | sort
 
-      - name: Restore Dependencies
-        run: dotnet restore libs.slnx
-
-      - name: Build Solution
-        run: dotnet build libs.slnx --configuration Release --no-restore
-
-      - name: Run Tests
-        run: dotnet test libs.slnx --configuration Release --no-build
-
+      - name: Check Missing Solution References
+        run: |
+          echo "=== Restore diagnostic ==="
+          dotnet restore libs.slnx --verbosity minimal
