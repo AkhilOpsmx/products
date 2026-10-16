@@ -2,7 +2,7 @@ name: Source Code Security Scan
 
 on:
   pull_request:
-    branches: [main, add-pr-scanner]
+    branches: [main]
 
 # Permissions for the automatically generated GITHUB_TOKEN.
 # Keep these scoped to what this workflow actually needs.
