@@ -75,7 +75,7 @@ jobs:
             --trivy-scanners=codelicensescan,codesecretscan \
             --cdxgen-scanners=sourcecodesbom \
             --repository-url="${{ github.server_url }}/${{ github.repository }}" \
-            --source-code-path=. \
+            --source-code-path="${{ github.workspace }}" \
             --build-id="${{ github.run_id }}" \
             --branch="${{ github.head_ref }}" \
             --upload-url="${{ secrets.SSD_UPLOAD_URL }}" \
@@ -83,7 +83,7 @@ jobs:
             --pr-id="${{ github.event.number }}" \
             --artifact-name="${{ github.event.repository.name }}" \
             --artifact-type=file \
-            --artifact-path=. \
+            --artifact-path="${{ github.workspace }}" \
             --artifact-tag="${{ github.sha }}" \
             --git-auth-type=token \
             --git-auth-key="${{ secrets.GH_TOKEN }}" \
