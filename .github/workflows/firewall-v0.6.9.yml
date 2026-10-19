@@ -106,6 +106,8 @@ jobs:
         if: ${{ always() && github.event_name == 'pull_request' }}
         continue-on-error: true
         uses: actions/github-script@v7
+        env:
+          SSD_TOKEN: ${{ secrets.TEAM_TOKEN }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -114,7 +116,8 @@ jobs:
             const secrets = {
               GITHUB_SERVER_URL: '${{ github.server_url }}',
               GITHUB_RUN_ID: '${{ github.run_id }}',
-              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}'
+              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}',
+              SSD_TOKEN: process.env.SSD_TOKEN
             };
 
             await createPRComment(github, context, secrets);
@@ -123,6 +126,8 @@ jobs:
         if: ${{ always() && github.event_name == 'pull_request' }}
         continue-on-error: true
         uses: actions/github-script@v7
+        env:
+          SSD_TOKEN: ${{ secrets.TEAM_TOKEN }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -131,7 +136,8 @@ jobs:
             const secrets = {
               GITHUB_SERVER_URL: '${{ github.server_url }}',
               GITHUB_RUN_ID: '${{ github.run_id }}',
-              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}'
+              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}',
+              SSD_TOKEN: process.env.SSD_TOKEN
             };
 
             showArtifactInfo(context, secrets);
