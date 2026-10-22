@@ -17,7 +17,7 @@ function portalUrl(secrets, context) {
   if (!teamId) {
     return baseUrl + '/ui/artifact-security-issues/generated';
   }
-  return baseUrl + '/ui/impacted-artifact?artifactName=' + encodeURIComponent(context.repo.repo) + '&teamId=' + encodeURIComponent(teamId);
+  return baseUrl + '/ui/impacted-artifact?artifactName=' + encodeURIComponent(context.repo.repo) + '&teamId=' + encodeURIComponent(teamId) + '&artifactVersion=' + encodeURIComponent(context.sha);
 }
 
 async function createPRComment(github, context, secrets) {
