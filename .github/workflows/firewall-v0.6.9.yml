@@ -2,14 +2,15 @@ name: Source Code Security Scan
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, add-pr-scanner]
 
-# Permissions for the automatically generated GITHUB_TOKEN.
-# Keep these scoped to what this workflow actually needs.
 permissions:
   contents: read
   issues: write
   pull-requests: write
+
+env:
+  SSD_IMAGE: docker.io/opsmx11/ssd-scanner-cli:v0.6.17
 
 jobs:
   security-scan:
@@ -17,94 +18,80 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ============================================================
-      # 1. Checkout the repository code
-      # ============================================================
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Fetch all history for base branch / diff detection
           fetch-depth: 0
 
-      # ============================================================
-      # 2. Download the SSD Scanner CLI
-      # ============================================================
-      - name: Download SSD Scanner CLI
+      - name: Pull SSD Scanner CLI image
         run: |
           set -e
 
-          curl -L -f -o ssd-scanner-cli \
-            https://github.com/OpsMx/ssd-scanner-cli-public/releases/download/v0.6.9/ssd-scanner-cli-amd64
+          docker pull "$SSD_IMAGE"
 
-          chmod +x ssd-scanner-cli
+          echo "SSD Scanner CLI image pulled successfully."
 
-          echo "SSD Scanner CLI downloaded successfully."
-
-      # ============================================================
-      # 3. Run SSD Security Scan
-      ##
-      # IMPORTANT:
-      # Do NOT use continue-on-error here.
-      #
-      # The exit code from SSD is the security gate:
-      #
-      #   exit 0     -> Security scan passed
-      #   exit != 0  -> Security scan failed
-      #
-      # This job is intended to be configured as a required
-      # GitHub status check.
-      # ============================================================
+      # The exit code is the security gate - do not add continue-on-error here
       - name: Run SSD Security Scan
         id: ssd-scan
+        env:
+          SSD_UPLOAD_URL: ${{ secrets.SSD_UPLOAD_URL }}
+          SSD_TOKEN: ${{ secrets.TEAM_TOKEN }}
+          GIT_AUTH_KEY: ${{ secrets.GH_TOKEN }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.number }}
+          ARTIFACT_NAME: ${{ github.event.repository.name }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           set -e
 
           echo "=============================================="
           echo "       SSD SECURITY FIREWALL"
           echo "=============================================="
-          echo "Repository : ${{ github.repository }}"
-          echo "PR         : #${{ github.event.number }}"
-          echo "Branch     : ${{ github.head_ref }}"
-          echo "Commit     : ${{ github.sha }}"
+          echo "Repository : $GITHUB_REPOSITORY"
+          echo "PR         : #$PR_NUMBER"
+          echo "Branch     : $HEAD_REF"
+          echo "Commit     : $COMMIT_SHA"
+          echo "Image      : $SSD_IMAGE"
           echo "=============================================="
 
-          echo "Running diff-scan for Pull Request #${{ github.event.number }}"
+          echo "Running diff-scan for Pull Request #$PR_NUMBER"
 
-          ./ssd-scanner-cli \
-            --scanners=trivy,cdxgen,opengrep \
-            --trivy-scanners=codelicensescan,codesecretscan \
-            --cdxgen-scanners=sourcecodesbom \
-            --repository-url="${{ github.server_url }}/${{ github.repository }}" \
-            --source-code-path=. \
-            --build-id="${{ github.run_id }}" \
-            --branch="${{ github.head_ref }}" \
-            --upload-url="${{ secrets.SSD_UPLOAD_URL }}" \
-            --ssd-token="${{ secrets.TEAM_TOKEN }}" \
-            --pr-id="${{ github.event.number }}" \
-            --artifact-name="${{ github.event.repository.name }}" \
-            --artifact-type=file \
-            --artifact-path=. \
-            --artifact-tag="${{ github.sha }}" \
-            --git-auth-type=token \
-            --git-auth-key="${{ secrets.GH_TOKEN }}" \
-            --interrupt-condition="all" \
-            --diff-scan="true" \
-            --interrupt-for-old-issues=false \
-            --keep-results=true \
+          # The image runs as uid 1000, so the results folder must be writable by it
+          RESULTS_DIR="$HOME/.local/bin/ssd-scan-results"
+          mkdir -p "$RESULTS_DIR"
+          chmod 777 "$RESULTS_DIR"
+
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/home/scanner/source:ro" \
+            -v "$RESULTS_DIR:/home/scanner/.local/bin/ssd-scan-results" \
+            "$SSD_IMAGE" \
+              --scanners=trivy,cdxgen,opengrep \
+              --trivy-scanners=codelicensescan,codesecretscan \
+              --cdxgen-scanners=sourcecodesbom \
+              --repository-url="$REPOSITORY_URL" \
+              --source-code-path=/home/scanner/source \
+              --build-id="$GITHUB_RUN_ID" \
+              --branch="$HEAD_REF" \
+              --upload-url="$SSD_UPLOAD_URL" \
+              --ssd-token="$SSD_TOKEN" \
+              --pr-id="$PR_NUMBER" \
+              --artifact-name="$ARTIFACT_NAME" \
+              --artifact-type=file \
+              --artifact-path=/home/scanner/source \
+              --artifact-tag="$COMMIT_SHA" \
+              --git-auth-type=token \
+              --git-auth-key="$GIT_AUTH_KEY" \
+              --interrupt-condition="all" \
+              --diff-scan="true" \
+              --interrupt-for-old-issues=false \
+              --keep-results=true
 
           echo "=============================================="
           echo "SSD SECURITY SCAN PASSED"
           echo "=============================================="
 
-      # ============================================================
-      # 4. Upload SSD findings
-      #
-      # This MUST run even if the SSD scan fails so that the
-      # developer can inspect the results.
-      #
-      # continue-on-error prevents an artifact upload problem from
-      # changing the security decision made by SSD.
-      # ============================================================
       - name: Upload Diff Scan Summary
         if: ${{ always() && github.event_name == 'pull_request' }}
         continue-on-error: true
@@ -115,29 +102,12 @@ jobs:
           retention-days: 90
           if-no-files-found: warn
 
-      # ============================================================
-      # 5. Comment on the PR with scan results
-      #
-      # github-script uses the automatically generated GITHUB_TOKEN.
-      #
-      # It is intentionally NOT using the broad GH_TOKEN/PAT.
-      #
-      # The workflow-level permissions above provide:
-      #
-      #   issues: write
-      #   pull-requests: write
-      #
-      # continue-on-error is intentional:
-      #
-      #   SSD PASS + comment failure = SECURITY PASS
-      #   SSD FAIL + comment failure  = SECURITY FAIL
-      #
-      # Reporting must not override the security decision.
-      # ============================================================
       - name: Comment PR with Security Scan Results
         if: ${{ always() && github.event_name == 'pull_request' }}
         continue-on-error: true
         uses: actions/github-script@v7
+        env:
+          SSD_TOKEN: ${{ secrets.TEAM_TOKEN }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -146,21 +116,18 @@ jobs:
             const secrets = {
               GITHUB_SERVER_URL: '${{ github.server_url }}',
               GITHUB_RUN_ID: '${{ github.run_id }}',
-              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}'
+              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}',
+              SSD_TOKEN: process.env.SSD_TOKEN
             };
 
             await createPRComment(github, context, secrets);
 
-      # ============================================================
-      # 6. Show artifact information in workflow logs
-      #
-      # Informational only. It must never affect the SSD security
-      # decision.
-      # ============================================================
       - name: Show Artifact Info
         if: ${{ always() && github.event_name == 'pull_request' }}
         continue-on-error: true
         uses: actions/github-script@v7
+        env:
+          SSD_TOKEN: ${{ secrets.TEAM_TOKEN }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -169,7 +136,8 @@ jobs:
             const secrets = {
               GITHUB_SERVER_URL: '${{ github.server_url }}',
               GITHUB_RUN_ID: '${{ github.run_id }}',
-              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}'
+              SSD_UPLOAD_URL: '${{ secrets.SSD_UPLOAD_URL }}',
+              SSD_TOKEN: process.env.SSD_TOKEN
             };
 
             showArtifactInfo(context, secrets);

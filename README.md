@@ -3,7 +3,9 @@
 [![License](https://img.shields.io/badge/License-Duende%20Software-blue)](https://duendesoftware.com/license)
 [![GitHub Discussions](https://img.shields.io/github/discussions/DuendeSoftware/community)](https://github.com/orgs/DuendeSoftware/discussions)
 
-This repository contains the core products developed by Duende Software.
+This repository contains the core products developed by Duende Software.test
+
+
 
 ### Duende IdentityServer
 [![NuGet](https://img.shields.io/nuget/v/Duende.IdentityServer.svg)](https://www.nuget.org/packages/Duende.IdentityServer)
@@ -20,7 +22,7 @@ Duende IdentityServer is a modern, standards-compliant OpenID Connect and OAuth 
 [![BFF CI](https://github.com/DuendeSoftware/products/actions/workflows/bff-ci.yml/badge.svg)](https://github.com/DuendeSoftware/products/actions/workflows/bff-ci.yml)
 
 The Backend for Frontend (BFF) pattern is a security architecture for browser-based JavaScript applications. It keeps access and refresh tokens on the server and eliminates the need for CORS, providing improved security for your web applications.
-test 234
+test 234567
 
 - [Documentation](https://docs.duendesoftware.com/identityserver/v7/bff/)
 - [Source Code](./bff)
