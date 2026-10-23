@@ -38,7 +38,7 @@ jobs:
           REPO_NAME: ${{ github.event.repository.name }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           fail() { echo "::error::SSD: $*"; exit 1; }
           case "$FAIL_ON" in none|low|medium|high|critical) ;; *) fail "fail-on must be none, low, medium, high or critical." ;; esac
           [ -n "$SSD_UPLOAD_URL" ] || fail "Secret SSD_UPLOAD_URL is not set."
