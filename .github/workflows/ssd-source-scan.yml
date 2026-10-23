@@ -1,0 +1,103 @@
+name: SSD Source Code Scan
+
+on:
+  workflow_call:
+    inputs:
+      fail-on:                # low = any finding; medium, high, critical = that level and above; none = report only
+        type: string
+        default: low
+      runner:                 # a Linux runner with Docker
+        type: string
+        default: ubuntu-latest
+      image:
+        type: string
+        default: docker.io/opsmx11/ssd-scanner-cli:v0.6.17
+    secrets:
+      SSD_UPLOAD_URL:
+        required: false
+      SSD_TEAM_TOKEN:
+        required: false
+
+jobs:
+  ssd-scan:
+    name: SSD source code scan
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SSD scan
+        env:
+          SSD_UPLOAD_URL: ${{ secrets.SSD_UPLOAD_URL }}
+          SSD_TEAM_TOKEN: ${{ secrets.SSD_TEAM_TOKEN }}
+          SSD_IMAGE: ${{ inputs.image }}
+          FAIL_ON: ${{ inputs.fail-on }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -uo pipefail
+          fail() { echo "::error::SSD: $*"; exit 1; }
+          case "$FAIL_ON" in none|low|medium|high|critical) ;; *) fail "fail-on must be none, low, medium, high or critical." ;; esac
+          [ -n "$SSD_UPLOAD_URL" ] || fail "Secret SSD_UPLOAD_URL is not set."
+          [ -n "$SSD_TEAM_TOKEN" ] || fail "Secret SSD_TEAM_TOKEN is not set."
+          docker info >/dev/null 2>&1 || fail "Docker is not available on this runner. Use a Linux runner with Docker."
+
+          # No dots in the name (SSD would read Contoso.Web as a file extension) and a version unique per run
+          NAME="$(printf '%s' "$REPO_NAME" | tr -c 'A-Za-z0-9-' '-')"
+          VERSION="${HEAD_SHA:0:7}-${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          LOG="$RUNNER_TEMP/ssd-scan.log"
+          GATE=()
+          [ "$FAIL_ON" = none ] || GATE=(--fail-on-severity="$FAIL_ON")
+          echo "SSD: scanning $NAME $VERSION on $BRANCH (fail on: $FAIL_ON)"
+
+          # githubactions needs the SSD team's GitHub integrator to be active
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/home/scanner/source:ro" \
+            "$SSD_IMAGE" \
+              --scanners=cdxgen,trivy,opengrep \
+              --cdxgen-scanners=sourcecodesbom \
+              --trivy-scanners=codelicensescan,codesecretscan \
+              --source-code-path=/home/scanner/source \
+              --artifact-type=file \
+              --artifact-path=/home/scanner/source \
+              --artifact-name="$NAME" \
+              --artifact-tag="$VERSION" \
+              --repository-url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              --branch="$BRANCH" \
+              --build-id="$GITHUB_RUN_ID" \
+              --tool=githubactions \
+              --upload-url="$SSD_UPLOAD_URL" \
+              --ssd-token="$SSD_TEAM_TOKEN" \
+              --wait-for-completion=true \
+              --wait-for-completion-timeout=30m \
+              ${GATE[@]+"${GATE[@]}"} 2>&1 | tee "$LOG"
+          RC=${PIPESTATUS[0]}
+
+          # The scanner exits 0 when SSD returns no result, so a missing result fails the run too
+          PLAIN="$(sed 's/\x1b\[[0-9;]*m//g' "$LOG")"
+          SUMMARY="$(printf '%s\n' "$PLAIN" | grep -E 'Synchronous build-event summary[[:space:]]+\{' | head -n 1)"
+          if [ -n "$SUMMARY" ]; then
+            RESULT="$(printf '%s\n' "$SUMMARY" | grep -oE '"(alerts|vulnerabilities)": ?\{[^}]*\}|"artifactSecurityUrl": ?"[^"]*"')"
+            echo "SSD result for $NAME $VERSION:"
+            printf '%s\n' "$RESULT" | sed 's/^/  /'
+            { echo "### SSD scan: $NAME $VERSION"; echo '```'; printf '%s\n' "$RESULT"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$FAIL_ON" != none ] && printf '%s\n' "$PLAIN" | grep -q 'fail-on-severity threshold met'; then
+            fail "Findings at or above '$FAIL_ON' in $NAME. See the SSD result above."
+          fi
+          [ "$RC" -eq 0 ] || fail "The scanner exited with code $RC."
+          if [ -z "$SUMMARY" ] || printf '%s\n' "$PLAIN" | grep -qE 'Failed to send build event|Synchronous build-event summary error'; then
+            if [ "$FAIL_ON" = none ]; then
+              echo "::warning::SSD returned no result for this scan."
+              exit 0
+            fi
+            fail "SSD returned no result for this scan, so the run fails to stay safe."
+          fi
+          if [ "$FAIL_ON" = none ]; then
+            echo "SSD: report only (fail-on: none), so the run is not failed."
+          else
+            echo "SSD: passed, nothing at or above '$FAIL_ON'."
+          fi

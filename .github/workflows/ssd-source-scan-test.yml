@@ -1,0 +1,26 @@
+name: SSD Source Scan Test
+
+on:
+  push:
+    branches: [ssd-source-scan-test]
+  workflow_dispatch:
+    inputs:
+      fail-on:
+        type: choice
+        options: [low, medium, high, critical, none]
+        default: low
+
+jobs:
+  ssd-scan:
+    uses: ./.github/workflows/ssd-source-scan.yml
+    with:
+      fail-on: ${{ inputs.fail-on || 'low' }}
+    secrets:
+      SSD_UPLOAD_URL: ${{ secrets.SSD_UPLOAD_URL }}
+      SSD_TEAM_TOKEN: ${{ secrets.TEAM_TOKEN }}
+
+  deploy:
+    needs: ssd-scan
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Upload and deploy run only after a clean SSD scan"
