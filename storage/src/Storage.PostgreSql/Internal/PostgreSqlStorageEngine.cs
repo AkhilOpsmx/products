@@ -58,7 +58,8 @@ internal sealed class PostgreSqlStorageEngine(
 
         await using var cmd = dataSource.CreateCommand();
         cmd.CommandType = CommandType.Text;
-        cmd.CommandText = $"SELECT CASE WHEN to_regnamespace('{_schemaName}') IS NOT NULL THEN obj_description(to_regnamespace('{_schemaName}')) END";
+        cmd.CommandText = "SELECT CASE WHEN to_regnamespace($1) IS NOT NULL THEN obj_description(to_regnamespace($1)) END";
+        _ = cmd.Parameters.AddWithValue(_schemaName);
         Log.ExecutingSql(logger, cmd.CommandText);
         var scalar = await cmd.ExecuteScalarAsync(ct);
 
